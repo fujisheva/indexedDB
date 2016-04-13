@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <title></title>
+    <style>
+        body{
+            margin: 0;
+            padding:0;
+        }
+        .container{
+            width: 960px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <input type="text" id="name"/>
+        <input type="radio" id="a1" value="1" name="answer" checked/>1
+        <input type="radio" id="a2" value="2" name="answer"/>2
+        <p>
+            <button id="save">save</button>
+        </p>
+        <p>
+            <label>序号:</label><input type="text" id="key"/>
+            <button id="read">read</button>
+            <button id="update">update</button>
+            <button id="readAll">all</button>
+        </p>
+        <div id="result">
+
+        </div>
+        <div id="all">
+
+        </div>
+    </div>
+<script type="text/javascript" src="js/jquery-1.12.2.min.js"></script>
+<script type="text/javascript">
+        var dbinfo={
+            name:'testDB',
+            version:3,
+            db:null,
+            store:"answers"
+        };
+
+        $.when(openDB(dbinfo)).done(function(){
+           readAll(dbinfo);
+
+        }).fail(function(){
+            alert('连接本地数据库失败!');
+        });
+
+
+        $("#save").bind("click",function(){
+            var obj={};
+            obj["name"]=$("#name").val();
+            obj["answer"]=$("input[name=answer]:checked").val();
+            addData(dbinfo,obj);
+        });
+        $("#read").bind("click",function(){
+            getDataByKey(dbinfo,$("#key").val());
+        });
+
+        $("#update").bind("click",function(){
+            updateDataByKey(dbinfo,$("#key").val());
+        });
+
+        $("#readAll").bind("click",function(){
+            readAll(dbinfo);
+        });
+
+    /**
+     * 创建或打开数据库及表格
+     * @param db 数据库
+     */
+    function openDB (dbinfo) {
+        var defer= $.Deferred();
+        var tasks=function(){
+            var indexedDB = window.indexedDB || window.webkitIndexedDB ||window.mozIndexedDB;
+            var request=indexedDB.open(dbinfo.name,dbinfo.version);
+            request.onerror=function(e){
+                defer.reject();
+            };
+            request.onsuccess=function(e){
+                dbinfo.db=e.target.result;
+                defer.resolve();
+            };
+            request.onupgradeneeded=function(e){
+                var db=e.target.result;
+                if(!db.objectStoreNames.contains(dbinfo.store)){
+                    db.createObjectStore(dbinfo.store,{keyPath:"id",autoIncrement:true});
+                }
+                console.log('DB version changed to '+dbinfo.version);
+                defer.resolve();
+            };
+        };
+        tasks();
+        return defer.promise();
+    };
+
+    /**
+     *  添加数据
+     * @param dbinfo 数据库信息对象
+     * @param obj 数据对象
+     */
+    function addData(dbinfo,obj){
+        var transaction=dbinfo.db.transaction(dbinfo.store,'readwrite');
+        var store=transaction.objectStore(dbinfo.store);
+            store.add(obj);
+
+    }
+
+        /**
+         * 读取数据
+         * @param dbinfo 数据库信息对象
+         */
+        function getDataByKey(dbinfo,key){
+            var transaction=dbinfo.db.transaction(dbinfo.store,'readwrite');
+            var store=transaction.objectStore(dbinfo.store);
+            var request=store.get(parseInt(key));
+            request.onsuccess=function(e){
+                var result=e.target.result;
+                $("#result").html(JSON.stringify(result));
+            };
+        }
+
+        function updateDataByKey(dbinfo,key){
+            var transaction=dbinfo.db.transaction(dbinfo.store,'readwrite');
+            var store=transaction.objectStore(dbinfo.store);
+            var request=store.get(parseInt(key));
+            request.onsuccess=function(e){
+                var result=e.target.result;
+                result.name=$("#name").val();
+                result.answer=$("input[name=answer]:checked").val();
+                store.put(result);
+            };
+        }
+
+        function readAll(dbinfo){
+            var list=[];
+            var transaction=dbinfo.db.transaction(dbinfo.store,'readwrite');
+            var store=transaction.objectStore(dbinfo.store);
+            // 打开游标，遍历store中所有数据
+            store.openCursor().onsuccess = function(event) {
+
+                var cursor = event.target.result;
+                if (cursor) {
+                   list.push(cursor.value);
+                    cursor.continue();
+                }
+                $("#all").html(JSON.stringify(list));
+            }
+        }
+
+</script>
+</body>
+</html>
